@@ -1,0 +1,87 @@
+suru kare  isme or kya kya add kar skate hai jisse ye project or advanced ho jaye like i want ki isme redis integration jo ki syd hai 
+media upload ek
+forward message 
+starredMessage
+pinned Chat 
+clrear chat
+Block?unBlock
+report User
+Profile Updates
+status/stories
+Typing Debounce
+presencesync(multiDevice)
+read recipt per user
+redis caching 
+lazy loading messages ,message indexing
+end to end encryption
+device Management
+horizontal scaling Sockets(redis adaptar)
+Voice call
+videoCall
+webRTC signaling    ye sab add kar skte hai kyaaa
+
+STAGE 1 — STRONG FOUNDATION + CORE CHAT
+Features
+✅ Redis Integration
+✅ Redis Caching
+✅ Lazy Loading Messages
+✅ Message Pagination
+✅ Message Indexing
+✅ Media Upload
+✅ Forward Message
+✅ Starred Messages
+✅ Pinned Chats
+✅ Clear Chat
+✅ Profile Updates
+✅ Typing Debounce
+✅ Read Receipt Per User
+
+STAGE 2 — REALTIME EXPERIENCE + USER CONTROL
+
+Features
+✅ Presence Sync (Multi Device)
+✅ Block / Unblock User
+✅ Report User
+✅ Device Management
+✅ Status / Stories
+✅ Story Viewers
+✅ Story Expiry
+✅ User Last Seen
+✅ Active Sessions
+
+STAGE 3 — SCALABILITY + DISTRIBUTED SYSTEMS
+
+Features
+✅ Horizontal Scaling Socket.io
+✅ Redis Adapter
+✅ BullMQ Queues
+✅ Distributed Notifications
+✅ Retry Jobs
+✅ Media Processing Queue
+✅ Background Workers
+✅ Rate Limiting
+✅ API Throttling
+
+STAGE 4 — ADVANCED COMMUNICATION
+
+
+Features
+✅ Voice Call
+✅ Video Call
+✅ WebRTC Signaling
+✅ ICE Candidate Exchange
+✅ Call Notifications
+✅ Incoming/Outgoing Call State
+✅ TURN/STUN Integration
+
+STAGE 5 — SECURITY + ENTERPRISE LEVEL
+
+Features
+✅ End-to-End Encryption
+✅ Encrypted Media URLs
+✅ Secure Key Exchange
+✅ Secure Device Verification
+✅ Session Revocation
+✅ Advanced Search
+✅ Audit Logs
+✅ Monitoring & Analytics
