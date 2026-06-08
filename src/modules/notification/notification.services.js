@@ -19,7 +19,13 @@ export const sendNotification=async(payload)=>{
   //publish notification to realTime
   await pub.publish(CHANNEL,JSON.stringify(notification));
   //add notification to queue for further processing like sending email
-  await notificationQueue.add("push-notification",notification);
+  await notificationQueue.add("push-notification",notification, {
+      attempts: 3,
+      backoff: {
+          type: "exponential",
+          delay: 1000
+      }
+  });
   return notification;
 
 };

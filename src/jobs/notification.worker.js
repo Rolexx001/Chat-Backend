@@ -7,7 +7,7 @@ new Worker(
         //Notification data from the queue
         const notification=job.data;
         //check user online status
-        const isOnline=await redis.get(`Online:${notification.userId}`);
+        const isOnline=(await redis.scard(`OnlineSockets:${notification.userId}`)) > 0;
 
         //if user is online, we can skip sending email or push notification as they will receive real-time notification via socket.io
         //if user is offline, we can send email or push notification

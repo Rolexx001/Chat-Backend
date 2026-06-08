@@ -1,5 +1,6 @@
 import { saveFile, optimizeImage, deleteFile } from './media.service.js';
 import User from '../../models/user.model.js';
+import { mediaQueue } from '../../jobs/media.queue.js';
 
 export const uploadFile = async (req, res, next) => {
     try {
@@ -7,11 +8,30 @@ export const uploadFile = async (req, res, next) => {
             return res.status(400).json({ success: false, message: 'No file uploaded' });
         }
 
-        const mediaUrl = await saveFile(req.file);
+        const rawUrl = await saveFile(req.file);
 
+        // Queue background job for image optimization if it's an image
+        if (req.file.mimetype.startsWith('image/')) {
+            await mediaQueue.add("process-image", {
+                tempPath: rawUrl,
+                userId: req.userId,
+                type: req.body.type || "message",
+                resourceId: req.body.resourceId
+            });
+
+            return res.status(200).json({
+                success: true,
+                status: "processing",
+                mediaUrl: rawUrl,
+                filename: req.file.originalname,
+            });
+        }
+
+        // For non-image files, bypass queue
         res.status(200).json({
             success: true,
-            mediaUrl,
+            status: "ready",
+            mediaUrl: rawUrl,
             filename: req.file.originalname,
         });
     } catch (error) {
@@ -25,18 +45,31 @@ export const uploadAvatar = async (req, res, next) => {
             return res.status(400).json({ success: false, message: 'No file uploaded' });
         }
 
-        const avatarUrl = await optimizeImage(req.file);
+        if (!req.file.mimetype.startsWith('image/')) {
+            return res.status(400).json({ success: false, message: 'Avatar must be an image' });
+        }
 
+        const rawUrl = await saveFile(req.file);
+
+        // Update user avatar to raw URL temporarily
         const user = await User.findByIdAndUpdate(
             req.userId,
-            { avatar: avatarUrl },
+            { avatar: rawUrl },
             { new: true }
         ).select('-password -refreshToken');
 
+        // Queue background optimization job
+        await mediaQueue.add("process-image", {
+            tempPath: rawUrl,
+            userId: req.userId,
+            type: "avatar"
+        });
+
         res.status(200).json({
             success: true,
+            status: "processing",
             user,
-            avatarUrl,
+            avatarUrl: rawUrl,
         });
     } catch (error) {
         next(error);
