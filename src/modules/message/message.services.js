@@ -11,15 +11,13 @@ import {
 } from "./message.repositories.js";
 import { invalidateUsersChatsCache, invalidateStarredCache } from "../../utils/cache.js";
 import Chat from "../../models/chat.model.js";
+import User from "../../models/user.model.js";
 import { sendNotification } from "../notification/notification.services.js";
 import { redis } from "../../config/redis.js";
 
 
 // send message service
-export const sendMessageService = async (
-  userId,
-  { chatId, content, mediaUrl, replyTo },
-) => {
+export const sendMessageService = async (userId, { chatId, content, mediaUrl, replyTo }) => {
   const chat = await Chat.findById(chatId);
   if (!chat) {
     throw new Error("Chat not found");
@@ -30,6 +28,17 @@ export const sendMessageService = async (
   if (!isParticipant) {
     throw new Error("You are not authorized to send message in this chat");
   }
+
+  if (!chat.isGroup) {
+    const otherParticipant = chat.participants.find(p => p.toString() !== userId.toString());
+    if (otherParticipant) {
+      const isBlocked = await User.exists({ _id: otherParticipant, blockedUser: userId });
+      const hasBlocked = await User.exists({ _id: userId, blockedUser: otherParticipant });
+      if (isBlocked || hasBlocked) {
+        throw new Error("Cannot send message: User block is active");
+      }
+    }
+  }
   if (replyTo) {
     const repliedMessage = await findMessageById(replyTo);
     if (!repliedMessage) {
@@ -39,9 +48,7 @@ export const sendMessageService = async (
       throw new Error("You can only reply to messages in the same chat");
     }
     if (repliedMessage.isDeleted) {
-      throw new Error(
-        "Cannot reply to deleted message"
-      );
+      throw new Error("Cannot reply to deleted message");
     }
   }
   const message = await createMessage({
@@ -207,6 +214,15 @@ export const forwardMessageService = async (userId, messageId, targetChatIds) =>
 
     const isTargetParticipant = targetChat.participants.some(id => id.toString() === userId.toString());
     if (!isTargetParticipant) continue;
+
+    if (!targetChat.isGroup) {
+      const otherParticipant = targetChat.participants.find(p => p.toString() !== userId.toString());
+      if (otherParticipant) {
+        const isBlocked = await User.exists({ _id: otherParticipant, blockedUser: userId });
+        const hasBlocked = await User.exists({ _id: userId, blockedUser: otherParticipant });
+        if (isBlocked || hasBlocked) continue;
+      }
+    }
 
     const forwardedMsg = await createMessage({
       chatId: targetChatId,

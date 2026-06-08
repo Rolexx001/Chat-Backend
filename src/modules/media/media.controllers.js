@@ -1,4 +1,4 @@
-import { saveFile, optimizeImage, deleteFile } from '../../services/media.service.js';
+import { saveFile, optimizeImage, deleteFile } from './media.service.js';
 import User from '../../models/user.model.js';
 
 export const uploadFile = async (req, res, next) => {

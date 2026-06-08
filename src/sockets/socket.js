@@ -9,12 +9,64 @@ export const initSocket=(serverIo)=>{
 
         // Join user-specific room for re
         // al-time notification purposes
-        socket.on("join",async(userId)=>{
+        socket.on("join",async(data)=>{
             try{
+                const userId = typeof data === 'object' ? data.userId : data;
+                const token = typeof data === 'object' ? data.token : null;
+
                 socket.userId=userId;
                 socket.join(userId);
                 console.log(`User ${userId} joined their room`);
-                await redis.set(`Online:${userId}`,"true");
+
+                if (token) {
+                    const jwt = (await import('jsonwebtoken')).default;
+                    try {
+                        const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+                        if (decoded.userId === userId) {
+                            socket.sessionId=decoded.sessionId;
+                            await redis.sadd(`SessionSockets:${decoded.sessionId}`, socket.id);
+                            await redis.set(`SocketSession:${socket.id}`, decoded.sessionId);
+                        }
+                    } catch (e) {
+                        console.error("Socket token verification failed:", e.message);
+                    }
+                }
+
+                // Track multi-device online status
+                const wasOffline = (await redis.scard(`OnlineSockets:${userId}`)) === 0;
+                await redis.sadd(`OnlineSockets:${userId}`, socket.id);
+
+                if (wasOffline) {
+                    const User = (await import('../models/user.model.js')).default;
+                    await User.findByIdAndUpdate(userId, { isOnline: true });
+
+                    // Broadcast online presence to chats
+                    const { fetchUserChats } = await import('../modules/chat/chat.services.js');
+                    const chats = await fetchUserChats(userId);
+                    const participantIds = new Set();
+                    chats.forEach(chat => {
+                        chat.participants.forEach(p => {
+                            const pIdStr = typeof p === 'object' && p._id ? p._id.toString() : p.toString();
+                            if (pIdStr !== userId.toString()) {
+                                participantIds.add(pIdStr);
+                            }
+                        });
+                    });
+
+                    // Filter out blocked/blockers
+                    const currentUser = await User.findById(userId).select('blockedUser');
+                    const blockers = await User.find({ blockedUser: userId }).select('_id');
+                    const blockedSet = new Set([
+                        ...(currentUser?.blockedUser || []).map(id => id.toString()),
+                        ...blockers.map(u => u._id.toString())
+                    ]);
+
+                    participantIds.forEach(pId => {
+                        if (!blockedSet.has(pId)) {
+                            io.to(pId).emit("UserPresence", { userId, isOnline: true });
+                        }
+                    });
+                }
             }
             catch(err){
                 console.error("Error joining socket room: ",err);
@@ -120,9 +172,48 @@ export const initSocket=(serverIo)=>{
                     Object.values(socket.typingTimeouts).forEach(clearTimeout);
                 }
                 if (socket.userId) {
-                    await redis.set(`Online:${socket.userId}`, "false");
+                    await redis.srem(`OnlineSockets:${socket.userId}`, socket.id);
+                    const isStillOnline = (await redis.scard(`OnlineSockets:${socket.userId}`)) > 0;
 
-                    console.log(`User ${socket.userId} disconnected`);
+                    if (socket.sessionId) {
+                        await redis.srem(`SessionSockets:${socket.sessionId}`, socket.id);
+                        await redis.del(`SocketSession:${socket.id}`);
+                    }
+
+                    console.log(`Socket ${socket.id} disconnected for user ${socket.userId}`);
+
+                    if (!isStillOnline) {
+                        const lastSeen = new Date();
+                        const User = (await import('../models/user.model.js')).default;
+                        await User.findByIdAndUpdate(socket.userId, { isOnline: false, lastSeen });
+
+                        // Broadcast offline presence to chats
+                        const { fetchUserChats } = await import('../modules/chat/chat.services.js');
+                        const chats = await fetchUserChats(socket.userId);
+                        const participantIds = new Set();
+                        chats.forEach(chat => {
+                            chat.participants.forEach(p => {
+                                const pIdStr = typeof p === 'object' && p._id ? p._id.toString() : p.toString();
+                                if (pIdStr !== socket.userId.toString()) {
+                                    participantIds.add(pIdStr);
+                                }
+                            });
+                        });
+
+                        // Filter out blocked/blockers
+                        const currentUser = await User.findById(socket.userId).select('blockedUser');
+                        const blockers = await User.find({ blockedUser: socket.userId }).select('_id');
+                        const blockedSet = new Set([
+                            ...(currentUser?.blockedUser || []).map(id => id.toString()),
+                            ...blockers.map(u => u._id.toString())
+                        ]);
+
+                        participantIds.forEach(pId => {
+                            if (!blockedSet.has(pId)) {
+                                io.to(pId).emit("UserPresence", { userId: socket.userId, isOnline: false, lastSeen });
+                            }
+                        });
+                    }
                 }
 
             } catch (error) {
