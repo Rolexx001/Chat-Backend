@@ -165,7 +165,131 @@ export const initSocket=(serverIo)=>{
                 console.error("Mark seen socket error:", error);
             }
         });
-        
+
+        // WebRTC Signaling Relays
+        socket.on("callUser", async ({ targetUserId, signalData, type }) => {
+            try {
+                if (!socket.userId) return;
+
+                // Check busy state
+                const isBusy = await redis.get(`activeCall:${targetUserId}`);
+                if (isBusy) {
+                    socket.emit("callBusy", { targetUserId });
+                    return;
+                }
+
+                // Check blocks
+                const User = (await import('../models/user.model.js')).default;
+                const isBlocked = await User.exists({ _id: targetUserId, blockedUser: socket.userId });
+                const hasBlocked = await User.exists({ _id: socket.userId, blockedUser: targetUserId });
+                if (isBlocked || hasBlocked) {
+                    socket.emit("callError", { message: "Cannot place call: Block active" });
+                    return;
+                }
+
+                // Create Call log
+                const Call = (await import('../models/call.model.js')).default;
+                const call = new Call({
+                    caller: socket.userId,
+                    receiver: targetUserId,
+                    type: type || 'voice',
+                    status: 'ongoing'
+                });
+                await call.save();
+
+                // Set busy status in Redis
+                await redis.set(`activeCall:${socket.userId}`, call._id.toString());
+                await redis.set(`activeCall:${targetUserId}`, call._id.toString());
+
+                // Check user online status
+                const targetOnline = (await redis.scard(`OnlineSockets:${targetUserId}`)) > 0;
+                if (targetOnline) {
+                    io.to(targetUserId).emit("incomingCall", {
+                        from: socket.userId,
+                        signalData,
+                        type: type || 'voice',
+                        callId: call._id
+                    });
+                } else {
+                    // Send push notification for missed call alert via BullMQ
+                    const { notificationQueue } = await import('../jobs/notification.queue.js');
+                    const callerUser = await User.findById(socket.userId).select('name');
+                    await notificationQueue.add("push-notification", {
+                        userId: targetUserId,
+                        type: "CALL",
+                        title: "Missed Call",
+                        body: `Incoming ${type || 'voice'} call from ${callerUser?.name || 'Unknown User'}`,
+                        data: { callId: call._id }
+                    }, {
+                        attempts: 3,
+                        backoff: { type: "exponential", delay: 1000 }
+                    });
+
+                    // Update database
+                    call.status = 'missed';
+                    call.endedAt = new Date();
+                    await call.save();
+
+                    // Clear busy status
+                    await redis.del(`activeCall:${socket.userId}`);
+                    await redis.del(`activeCall:${targetUserId}`);
+
+                    socket.emit("callUserOffline", { targetUserId, callId: call._id });
+                }
+            } catch (err) {
+                console.error("Socket callUser error:", err);
+                socket.emit("callError", { message: "Internal server error starting call" });
+            }
+        });
+
+        socket.on("acceptCall", ({ callerId, signalData, callId }) => {
+            try {
+                io.to(callerId).emit("callAccepted", { signalData, callId });
+            } catch (err) {
+                console.error("Socket acceptCall error:", err);
+            }
+        });
+
+        socket.on("rejectCall", async ({ callerId, callId }) => {
+            try {
+                const Call = (await import('../models/call.model.js')).default;
+                await Call.findByIdAndUpdate(callId, { status: 'rejected', endedAt: new Date() });
+
+                await redis.del(`activeCall:${socket.userId}`);
+                await redis.del(`activeCall:${callerId}`);
+
+                io.to(callerId).emit("callRejected", { callId });
+            } catch (err) {
+                console.error("Socket rejectCall error:", err);
+            }
+        });
+
+        socket.on("iceCandidate", ({ targetUserId, candidate, callId }) => {
+            try {
+                io.to(targetUserId).emit("iceCandidate", { candidate, from: socket.userId, callId });
+            } catch (err) {
+                console.error("Socket iceCandidate error:", err);
+            }
+        });
+
+        socket.on("endCall", async ({ targetUserId, callId, duration }) => {
+            try {
+                const Call = (await import('../models/call.model.js')).default;
+                await Call.findByIdAndUpdate(callId, {
+                    status: 'completed',
+                    duration: duration || 0,
+                    endedAt: new Date()
+                });
+
+                await redis.del(`activeCall:${socket.userId}`);
+                await redis.del(`activeCall:${targetUserId}`);
+
+                io.to(targetUserId).emit("callEnded", { callId });
+            } catch (err) {
+                console.error("Socket endCall error:", err);
+            }
+        });
+
         socket.on("disconnect",async()=>{
             try {
                 if (socket.typingTimeouts) {
@@ -181,6 +305,30 @@ export const initSocket=(serverIo)=>{
                     }
 
                     console.log(`Socket ${socket.id} disconnected for user ${socket.userId}`);
+
+                    // Check if in active call and clean up
+                    const activeCallId = await redis.get(`activeCall:${socket.userId}`);
+                    if (activeCallId) {
+                        try {
+                            const Call = (await import('../models/call.model.js')).default;
+                            const call = await Call.findById(activeCallId);
+                            if (call && call.status === 'ongoing') {
+                                call.status = 'completed';
+                                call.endedAt = new Date();
+                                const duration = Math.round((new Date() - call.startedAt) / 1000);
+                                call.duration = duration > 0 ? duration : 0;
+                                await call.save();
+
+                                const otherParticipant = call.caller.toString() === socket.userId ? call.receiver.toString() : call.caller.toString();
+                                io.to(otherParticipant).emit("callEnded", { callId: activeCallId, reason: "peer_disconnected" });
+
+                                await redis.del(`activeCall:${socket.userId}`);
+                                await redis.del(`activeCall:${otherParticipant}`);
+                            }
+                        } catch (err) {
+                            console.error("Socket disconnect active call cleanup error:", err);
+                        }
+                    }
 
                     if (!isStillOnline) {
                         const lastSeen = new Date();
