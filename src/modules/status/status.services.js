@@ -2,6 +2,9 @@ import Status from '../../models/status.model.js';
 import User from '../../models/user.model.js';
 import { fetchUserChats } from '../chat/chat.services.js';
 import { deleteFile } from '../media/media.service.js';
+import path from 'path';
+import mime from 'mime-types';
+import { mediaQueue } from '../../jobs/media.queue.js';
 
 export const createStatusService = async (userId, mediaUrl, caption) => {
     const status = new Status({
@@ -10,6 +13,21 @@ export const createStatusService = async (userId, mediaUrl, caption) => {
         caption: caption || ''
     });
     await status.save();
+
+    // Queue background image optimization if it's a local unoptimized image
+    if (mediaUrl && mediaUrl.startsWith('/uploads/') && !mediaUrl.endsWith('.webp')) {
+        const filepath = path.join('.', mediaUrl);
+        const mimetype = mime.lookup(filepath);
+        if (mimetype && mimetype.startsWith('image/')) {
+            await mediaQueue.add("process-image", {
+                tempPath: mediaUrl,
+                userId,
+                type: "status",
+                resourceId: status._id
+            });
+        }
+    }
+
     return status;
 };
 

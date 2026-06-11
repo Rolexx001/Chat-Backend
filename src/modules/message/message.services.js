@@ -14,6 +14,9 @@ import Chat from "../../models/chat.model.js";
 import User from "../../models/user.model.js";
 import { sendNotification } from "../notification/notification.services.js";
 import { redis } from "../../config/redis.js";
+import path from 'path';
+import mime from 'mime-types';
+import { mediaQueue } from '../../jobs/media.queue.js';
 
 
 // send message service
@@ -60,6 +63,21 @@ export const sendMessageService = async (userId, { chatId, content, mediaUrl, re
   });
   await updateLastMessage(chatId, message._id);
   await invalidateUsersChatsCache(chat.participants);
+
+  // Queue background image optimization if it's a local unoptimized image
+  if (mediaUrl && mediaUrl.startsWith('/uploads/') && !mediaUrl.endsWith('.webp')) {
+    const filepath = path.join('.', mediaUrl);
+    const mimetype = mime.lookup(filepath);
+    if (mimetype && mimetype.startsWith('image/')) {
+      await mediaQueue.add("process-image", {
+        tempPath: mediaUrl,
+        userId,
+        type: "message",
+        resourceId: message._id
+      });
+    }
+  }
+
   await Promise.all(
     chat.participants
       .filter((participant) => participant.toString() !== userId.toString())
