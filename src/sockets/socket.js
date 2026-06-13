@@ -1,20 +1,20 @@
-import {redis} from '../config/redis.js';
+import { redis } from '../config/redis.js';
 
 export let io;
 
-export const initSocket=(serverIo)=>{
-    io=serverIo;
-    io.on("connection",(socket)=>{
-        console.log("A user connected: ",socket.id);
+export const initSocket = (serverIo) => {
+    io = serverIo;
+    io.on("connection", (socket) => {
+        console.log("A user connected: ", socket.id);
 
         // Join user-specific room for re
         // al-time notification purposes
-        socket.on("join",async(data)=>{
-            try{
+        socket.on("join", async (data) => {
+            try {
                 const userId = typeof data === 'object' ? data.userId : data;
                 const token = typeof data === 'object' ? data.token : null;
 
-                socket.userId=userId;
+                socket.userId = userId;
                 socket.join(userId);
                 console.log(`User ${userId} joined their room`);
 
@@ -23,7 +23,7 @@ export const initSocket=(serverIo)=>{
                     try {
                         const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
                         if (decoded.userId === userId) {
-                            socket.sessionId=decoded.sessionId;
+                            socket.sessionId = decoded.sessionId;
                             await redis.sadd(`SessionSockets:${decoded.sessionId}`, socket.id);
                             await redis.set(`SocketSession:${socket.id}`, decoded.sessionId);
                         }
@@ -68,42 +68,42 @@ export const initSocket=(serverIo)=>{
                     });
                 }
             }
-            catch(err){
-                console.error("Error joining socket room: ",err);
+            catch (err) {
+                console.error("Error joining socket room: ", err);
             }
         });
 
         // Join chat room for real-time messaging
-        socket.on("joinChat",(chatId)=>{
-            try{
+        socket.on("joinChat", (chatId) => {
+            try {
                 socket.join(chatId);
                 console.log(`User joined chat ${chatId}`);
-            } catch(err){
-                console.error("join chat socket error: ",err);
+            } catch (err) {
+                console.error("join chat socket error: ", err);
             }
         });
-        
-        socket.on("leaveChat",(chatId)=>{
-            try{
+
+        socket.on("leaveChat", (chatId) => {
+            try {
                 socket.leave(chatId);
                 console.log(`User left chat ${chatId}`);
-            } catch(err){
-                console.error("leave chat socket error: ",err);
+            } catch (err) {
+                console.error("leave chat socket error: ", err);
             }
         });
         // Handle sending messages
-        socket.on("sendMessage",(message)=>{
-            try{
+        socket.on("sendMessage", (message) => {
+            try {
                 // Emit the message to other participants in the chat room
-                socket.to(message.chatId).emit("ReceiveMessage",message);
-            } catch(err){
-                console.error("send message socket error: ",err);
+                socket.to(message.chatId).emit("ReceiveMessage", message);
+            } catch (err) {
+                console.error("send message socket error: ", err);
             }
         });
 
         // Handle typing events
-        socket.on("typing",({chatId})=>{
-             try {
+        socket.on("typing", ({ chatId }) => {
+            try {
                 socket.to(chatId).emit("Typing", {
                     userId: socket.userId,
                 });
@@ -129,10 +129,10 @@ export const initSocket=(serverIo)=>{
                 console.error("Typing socket error:", error);
             }
         });
-        
-        socket.on("stopTyping",({chatId})=>{
-            try{
-                socket.to(chatId).emit("StopTyping",{userId:socket.userId});
+
+        socket.on("stopTyping", ({ chatId }) => {
+            try {
+                socket.to(chatId).emit("StopTyping", { userId: socket.userId });
                 if (socket.typingTimeouts && socket.typingTimeouts[chatId]) {
                     clearTimeout(socket.typingTimeouts[chatId]);
                     delete socket.typingTimeouts[chatId];
@@ -142,25 +142,25 @@ export const initSocket=(serverIo)=>{
             }
         });
 
-        socket.on("editMessage",(data)=>{
-            try{
-                socket.to(data.chatId).emit("MessageEdited",data);
+        socket.on("editMessage", (data) => {
+            try {
+                socket.to(data.chatId).emit("MessageEdited", data);
             } catch (error) {
                 console.error("Edit message socket error:", error);
             }
         });
 
-        socket.on("deleteMessage",(data)=>{
-            try{
-                socket.to(data.chatId).emit("MessageDeleted",data);
+        socket.on("deleteMessage", (data) => {
+            try {
+                socket.to(data.chatId).emit("MessageDeleted", data);
             } catch (error) {
                 console.error("Delete message socket error:", error);
             }
         });
 
-        socket.on("markSeen",({chatId,messageId,userId})=>{
-            try{
-                socket.to(chatId).emit("MessageSeen",{messageId,userId});
+        socket.on("markSeen", ({ chatId, messageId, userId }) => {
+            try {
+                socket.to(chatId).emit("MessageSeen", { messageId, userId });
             } catch (error) {
                 console.error("Mark seen socket error:", error);
             }
@@ -290,7 +290,7 @@ export const initSocket=(serverIo)=>{
             }
         });
 
-        socket.on("disconnect",async()=>{
+        socket.on("disconnect", async () => {
             try {
                 if (socket.typingTimeouts) {
                     Object.values(socket.typingTimeouts).forEach(clearTimeout);
@@ -318,7 +318,6 @@ export const initSocket=(serverIo)=>{
                                 const duration = Math.round((new Date() - call.startedAt) / 1000);
                                 call.duration = duration > 0 ? duration : 0;
                                 await call.save();
-
                                 const otherParticipant = call.caller.toString() === socket.userId ? call.receiver.toString() : call.caller.toString();
                                 io.to(otherParticipant).emit("callEnded", { callId: activeCallId, reason: "peer_disconnected" });
 
@@ -369,6 +368,6 @@ export const initSocket=(serverIo)=>{
             }
 
         });
-    
+
     });
 };
