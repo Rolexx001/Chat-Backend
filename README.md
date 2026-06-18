@@ -20,26 +20,6 @@ Built with **Node.js**, **Express**, **Socket.io**, and **MongoDB**, backed by *
 
 ---
 
-## 🏗 System Architecture
-
-The project utilizes a distributed memory model to support horizontal clustering and high traffic volumes:
-
-```mermaid
-graph TD
-    Client1[Client App A] <-->|Socket / WebRTC| LB[Load Balancer / Server Instance]
-    Client2[Client App B] <-->|Socket / WebRTC| LB
-    LB <--> Express[Express HTTP REST API]
-    LB <--> SocketIO[Socket.io Real-Time Server]
-    
-    SocketIO <-->|Scale Adapter| RedisAdapter[Redis Pub/Sub & Memory Cache]
-    Express <-->|Database Queries| Mongo[(MongoDB)]
-    Express <-->|Job Dispatcher| BullMQ[BullMQ Redis Queue]
-    
-    BullMQWorker[BullMQ Background Workers] <-->|Optimize Media| Sharp[Sharp Engine]
-    RedisAdapter <-->|Session / Presence / Call Locks| RedisStore[Redis Memory Store]
-```
-
----
 
 ## 🛠 Tech Stack
 
