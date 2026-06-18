@@ -18,9 +18,15 @@ export const setCache = async (key, data, ttl = 3600) => {
     }
 };
 
-export const invalidateUsersChatsCache=async(userIds)=>{
-    const keys=userIds.map((id)=>`chat.cache:${id}`);
-    if(keys.length){
+export const invalidateUsersChatsCache = async (userIds) => {
+    if (!userIds || !Array.isArray(userIds)) return;
+    const keys = userIds
+        .filter(Boolean)
+        .map((id) => {
+            const rawId = id._id ? id._id.toString() : id.toString();
+            return `chat.cache:${rawId}`;
+        });
+    if (keys.length) {
         await redis.del(keys);
     }
 };

@@ -44,29 +44,41 @@ export const addMember = async (chatId, userId, newUserId) => {
 
     if (!chat.isGroup) throw new Error("Not a Group");
 
-    if (chat.Admin.toString() !== userId) throw new Error("Only Admins can add Members");
+    if (chat.Admin.toString() !== userId.toString()) throw new Error("Only Admins can add Members");
+
+    if (!newUserId) throw new Error("User ID to add is required");
+
+    const isMember = chat.participants.some(
+        (id) => id.toString() === newUserId.toString()
+    );
+    if (isMember) throw new Error("User is already a member of this group");
 
     chat.participants.push(newUserId);
+    const updatedChat = await saveChat(chat);
     await invalidateUsersChatsCache(chat.participants);
 
-    return await saveChat(chat);
-
-
-
+    return updatedChat;
 };
 export const removeMember = async (chatId, userId, removeUserId) => {
     const chat = await findChatById(chatId);
 
     if (!chat.isGroup) throw new Error("Not a Group");
 
-    if (chat.Admin.toString() !== userId) throw new Error("Only Admins can add Members");
+    if (chat.Admin.toString() !== userId.toString()) throw new Error("Only Admins can remove Members");
 
-    chat.participants = chat.participants.filter(
-        (id) => id.toString() !== removeUserId
+    if (!removeUserId) throw new Error("User ID to remove is required");
+
+    const isMember = chat.participants.some(
+        (id) => id.toString() === removeUserId.toString()
     );
-    await invalidateUsersChatsCache(chat.participants);
+    if (!isMember) throw new Error("User is not a member of this group");
 
-    return await saveChat(chat);
+    const participantsToInvalidate = [...chat.participants];
+    chat.participants.pull(removeUserId);
+    const updatedChat = await saveChat(chat);
+    await invalidateUsersChatsCache(participantsToInvalidate);
+
+    return updatedChat;
 };
 
 export const pinMessageService = async (chatId, messageId, userId) => {
@@ -91,10 +103,10 @@ export const unpinMessageService = async (chatId, messageId, userId) => {
     const isParticipant = chat.participants.some(id => id.toString() === userId.toString());
     if (!isParticipant) throw new Error("Not authorized");
 
-    chat.pinnedMessages = chat.pinnedMessages.filter(id => id.toString() !== messageId.toString());
-    await saveChat(chat);
+    chat.pinnedMessages.pull(messageId);
+    const updatedChat = await saveChat(chat);
     await invalidateUsersChatsCache(chat.participants);
-    return chat;
+    return updatedChat;
 };
 
 export const getPinnedMessagesService = async (chatId, userId) => {
