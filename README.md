@@ -93,11 +93,11 @@ npm install
 ### 2. Environment Setup
 Create a `.env` file in the root directory:
 ```env
-PORT=5000
-MONGO_URI=mongodb://localhost:27017/chat-app
-REDIS_URL=redis://localhost:6379
-ACCESS_TOKEN_SECRET=your_access_token_secret
-REFRESH_TOKEN_SECRET=your_refresh_token_secret
+PORT,
+MONGO_URI,
+REDIS_URL,
+ACCESS_TOKEN_SECRET,
+REFRESH_TOKEN_SECRET,
 ```
 
 ### 3. Run the Servers
