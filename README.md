@@ -74,83 +74,10 @@ src/
 
 ---
 
-## 🚀 Quick Start Guide
 
-### Prerequisites
-Make sure you have the following installed locally:
-- Node.js (v18+)
-- MongoDB
-- Redis Server
 
-### 1. Installation
-Clone the repository and install dependencies:
-```bash
-git clone https://github.com/your-username/chat-backend.git
-cd chat-backend
-npm install
-```
 
-### 2. Environment Setup
-Create a `.env` file in the root directory:
-```env
-PORT,
-MONGO_URI,
-REDIS_URL,
-ACCESS_TOKEN_SECRET,
-REFRESH_TOKEN_SECRET,
-```
 
-### 3. Run the Servers
-Start the database background processes (Redis/MongoDB) on your system, and then run the application:
-
-```bash
-# Start the backend server (automatically runs nodemon in dev)
-npm run dev
-```
-
----
-
-## 🔌 WebRTC Calling Workflow
-
-When a user initiates a call, the server coordinates the signaling steps and locks their availability state in Redis to prevent multiple call collisions:
-
-```text
-Caller (Client A)                 Server (Socket.io & Redis)               Receiver (Client B)
-       │                                     │                                    │
-       ├─────────── callUser ───────────────>┤                                    │
-       │                                     ├───────── incomingCall ────────────>┤
-       │                                     │                                    │
-       │<───────── callAccepted ─────────────┼─────────── acceptCall ─────────────┤
-       │                                     │                                    │
-       ├────────── iceCandidate ────────────>┤                                    │
-       │                                     ├────────── iceCandidate ───────────>┤
-       │                                     │                                    │
-       ├───────────── endCall ──────────────>┤                                    │
-       │                                     ├─────────── callEnded ─────────────>┤
-```
-
----
-
-## 🧪 Integration & Manual Testing
-
-The project includes pre-configured testing setups:
-1. **REST & Socket API Integration Tests**: Run `node src/tests/test_api.js` to execute a 33-step complete automation test flow verifying endpoints, databases, socket updates, and cache state.
-2. **WebRTC In-Browser Test Client**: An in-browser WebRTC testing utility is included. Serve it locally with:
-   ```bash
-   npx serve .
-   ```
-   Open `http://localhost:3000/call_test.html` in your browser (using local servers to bypass browser microphone/camera security restrictions).
-
----
-
-## 📄 Documentation Links
-
-- For HTTP endpoints payloads and query params, check [postman_api_docs.md](file:///home/amansagar/Projects/chat-backend/postman_api_docs.md).
-- For WebSocket and real-time events schema, check [websocket_docs.md](file:///home/amansagar/Projects/chat-backend/websocket_docs.md).
-- For Redis caching and invalidation specs, check [redis_docs.md](file:///home/amansagar/Projects/chat-backend/redis_docs.md).
-- For React frontend integration prompt, check [frontend_prompt.md](file:///home/amansagar/Projects/chat-backend/frontend_prompt.md).
-
----
 
 ## 🤝 Contributing
 Contributions, issues, and feature requests are welcome! Feel free to check the issues page.
