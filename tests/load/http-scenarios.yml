@@ -1,0 +1,47 @@
+config:
+  target: "http://localhost:5000"
+  phases:
+    - duration: 30
+      arrivalRate: 2
+      name: "Warm-up"
+    - duration: 60
+      arrivalRate: 10
+      name: "Sustained load"
+  payload:
+    path: "./users.csv"
+    fields:
+      - "userId"
+      - "token"
+      - "sessionId"
+      - "chatId"
+      - "targetUserId"
+    order: "sequence"
+    skipHeader: true
+
+scenarios:
+  - name: "HTTP Chat API Load Flow"
+    flow:
+      - get:
+          url: "/api/auth/profile"
+          headers:
+            Authorization: "Bearer {{ token }}"
+      - think: 1
+      - get:
+          url: "/api/user/search?query=loadtest"
+          headers:
+            Authorization: "Bearer {{ token }}"
+      - think: 1
+      - get:
+          url: "/api/chat"
+          headers:
+            Authorization: "Bearer {{ token }}"
+      - think: 1
+      - post:
+          url: "/api/message"
+          headers:
+            Authorization: "Bearer {{ token }}"
+            Content-Type: "application/json"
+          json:
+            chatId: "{{ chatId }}"
+            content: "Hello from Artillery HTTP Load Test!"
+      - think: 2
