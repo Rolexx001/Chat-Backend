@@ -6,7 +6,12 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "load-test:seed": "node tests/load/seed.js",
+    "load-test:http": "artillery run tests/load/http-scenarios.yml --output tests/load/http-report.json && artillery report tests/load/http-report.json --output tests/load/http-report.html",
+    "load-test:socket": "artillery run tests/load/socket-scenarios.yml --output tests/load/socket-report.json && artillery report tests/load/socket-report.json --output tests/load/socket-report.html",
+    "load-test:cleanup": "node tests/load/cleanup.js",
+    "load-test:all": "npm run load-test:seed && npm run load-test:http && npm run load-test:socket && npm run load-test:cleanup"
   },
   "keywords": [],
   "author": "",
@@ -33,6 +38,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "artillery": "^2.0.33",
     "nodemon": "^3.1.14"
   }
 }

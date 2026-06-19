@@ -9,3 +9,9 @@ websocket_docs.md
 redis_docs.md
 call_test.html
 frontend_prompt.md
+
+# Load testing
+tests/load/*-report.json
+tests/load/*-report.html
+tests/load/users.csv
+

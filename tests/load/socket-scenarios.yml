@@ -1,0 +1,63 @@
+config:
+  target: "http://localhost:5000"
+  phases:
+    - duration: 30
+      arrivalRate: 2
+      name: "Ramping up connections"
+    - duration: 60
+      arrivalRate: 5
+      name: "Sustained connections"
+  engines:
+    socketio:
+      transports: ["websocket"]
+  payload:
+    path: "./users.csv"
+    fields:
+      - "userId"
+      - "token"
+      - "sessionId"
+      - "chatId"
+      - "targetUserId"
+    order: "sequence"
+    skipHeader: true
+
+scenarios:
+  - name: "Socket.io Chat Flow"
+    engine: socketio
+    flow:
+      # Step 1: Connect and join/authenticate
+      - emit:
+          channel: "join"
+          data:
+            userId: "{{ userId }}"
+            token: "{{ token }}"
+      - think: 2
+      
+      # Step 2: Join the chat room
+      - emit:
+          channel: "joinChat"
+          data: "{{ chatId }}"
+      - think: 2
+
+      # Step 3: Emit typing indicator
+      - emit:
+          channel: "typing"
+          data:
+            chatId: "{{ chatId }}"
+      - think: 1.5
+
+      # Step 4: Emit stop typing
+      - emit:
+          channel: "stopTyping"
+          data:
+            chatId: "{{ chatId }}"
+      - think: 0.5
+
+      # Step 5: Send message
+      - emit:
+          channel: "sendMessage"
+          data:
+            chatId: "{{ chatId }}"
+            content: "Hello from socket load test!"
+            sender: "{{ userId }}"
+      - think: 5
